@@ -1,0 +1,5 @@
+# NAME	TYPE	SIZE	RM	TRAN	MOUNTPOINTS	FSTYPE	MD_MEMBER	MODEL	SERIAL
+/dev/sda	disk	120034123776	0	sata	-	-	0	OSDISK	OS123
+/dev/sdb	disk	2000398934016	0	sata	-	linux_raid_member	1	DATA1	D1
+/dev/sdc	disk	2000398934016	0	sata	-	linux_raid_member	1	DATA2	D2
+/dev/sdz	disk	16008609792	1	usb	/installer	vfat	0	USB	USB1
