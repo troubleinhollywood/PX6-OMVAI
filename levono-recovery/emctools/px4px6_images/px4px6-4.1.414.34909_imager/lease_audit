@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+#       It's called from dhclient-script and use the variable $interface from that.
+#
+#########################################################
+
+dhc_failed="/run/dhclient.$interface.failure"
+dhc_success="/run/dhclient.$interface.success"
+
+
+res=`ifconfig $interface | grep 'inet addr'`
+
+if [[ $res=="" ]]; then
+        rm -f $dhc_success
+        rm -f $dhc_failed
+else
+	res_dhclient=`ifconfig $interface | grep 'inet addr' | grep -v '169.254'`
+	if [[ $res_dhclient=="" ]]; then
+        	if [ ! -f $dhc_failed ]; then
+                	/sbin/addLog -d 7
+	                touch $dhc_failed
+        	        rm -f $dhc_success
+	        fi
+	else
+        	if [ ! -f $dhc_success ]; then
+                	/sbin/addLog -d 6
+	                rm -f $dhc_failed
+        	        touch $dhc_success
+	        fi
+	fi
+fi

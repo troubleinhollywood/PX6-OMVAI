@@ -1,0 +1,19 @@
+# Downloaded and extracted installer images
+/iso/
+*.iso
+*.img
+
+# Build directories
+/build/*
+/output/*
+/cache/*
+
+# Keep empty directories
+!/build/.gitkeep
+!/output/.gitkeep
+!/cache/.gitkeep
+
+# Extracted build files
+/source/
+/iso-root/
+/initrd-root/

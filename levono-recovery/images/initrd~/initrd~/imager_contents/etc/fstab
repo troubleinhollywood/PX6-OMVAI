@@ -1,0 +1,5 @@
+# This file is edited by fstab-sync - see 'man fstab-sync' for details
+none                    /proc                   proc    defaults        0 0
+none                    /sys                    sysfs   defaults        0 0
+none			/sysroot		tmpfs	defaults	0 0
+

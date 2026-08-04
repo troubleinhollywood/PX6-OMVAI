@@ -1,0 +1,101 @@
+#!/bin/sh
+
+# mount proc & sys
+mount -a
+
+# need at most three loop devices
+mknod /dev/loop0 b 7 0
+mknod /dev/loop1 b 7 1
+mknod /dev/loop2 b 7 2
+
+# special device needed by DEPP
+mknod /dev/zero c 1 5
+
+# check for "shell" directive from kernel args
+# drop to a shell for debugging if present
+cmdline=`cat /proc/cmdline`
+echo "Looking for shell in cmdline: $cmdline"
+shl=`/bin/grep shell /proc/cmdline`
+if [ -n "$shl" ];then
+        /bin/echo "'shell' found in /proc/cmdline"
+        /bin/sh
+fi
+
+# call platform specific script to mount apps / config images
+/mount_images.sh
+mount_result=$?
+
+# create root directory structure
+echo "Constructing root filesystem..."
+
+# link main apps dirs
+ln -s /mnt/apps/bin sysroot/bin
+ln -s /mnt/apps/lib sysroot/lib
+ln -s /mnt/apps/sbin sysroot/sbin
+ln -s /mnt/apps/usr sysroot/usr
+ln -s /lib sysroot/lib64
+
+# populate ram area
+if [ -d /sysroot/mnt/apps/ram ]; then
+	cp -R /sysroot/mnt/apps/ram /sysroot/
+fi
+
+# temp dirs
+mkdir -p sysroot/tmp
+if [ -d /sysroot/mnt/apps/var ]; then
+	cp -rf sysroot/mnt/apps/var sysroot/
+fi
+if [ -d /sysroot/mnt/apps/run ]; then
+	cp -rf sysroot/mnt/apps/run sysroot/
+fi
+
+mkdir -m 755 -p sysroot/var/empty
+mkdir -m 755 -p sysroot/var/lib
+mkdir -m 755 -p sysroot/var/run
+mkdir -m 755 -p sysroot/var/lock
+mkdir -m 755 -p sysroot/var/log
+mkdir -m 755 -p sysroot/var/spool
+mkdir -m 755 -p sysroot/var/tmp
+
+# other misc. dirs
+mkdir -p sysroot/proc
+mkdir -p sysroot/sys
+mkdir -p sysroot/mnt/system
+mkdir -p sysroot/home
+mkdir -p sysroot/selinux
+
+ln -s /etc/debug sysroot/debug
+
+# pivot to the new root
+echo 0x0100 > /proc/sys/kernel/real-root-dev
+umount /proc
+umount /sys
+mkdir sysroot/initrd
+pivot_root sysroot sysroot/initrd
+
+# call bootstrap script
+echo "Bootstrapping ..."
+ln -sf /proc/mounts /etc/mtab
+
+/usr/local/cfg/initrd_bootstrap.sh
+
+mount none / -o remount,size=50M
+
+# If we are in DEPP mode, then we need to shutdown/reboot here
+# X86 platforms will use "depp" in kernel cmdline argument
+# ARM platforms will use "mount_result" = 3 return value from mount_images script
+deppmode=`/bin/grep depp /proc/cmdline`
+if [ -n "$deppmode" ] || [ "$mount_result" -eq "3" ];then
+	echo "DEPP process is complete"
+	# use this to power down unit
+	#poweroff -d3 -f
+	# use this to reboot unit
+	echo "Rebooting..."
+	reboot -d3 -f
+fi
+
+echo "Initialization complete."
+if [ `uname -r` == "3.8.6" ];then
+	exec /sbin/init
+	echo "Kernel Panic"
+fi
