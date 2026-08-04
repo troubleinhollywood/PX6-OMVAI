@@ -5,3 +5,34 @@ build/
 source/
 *.log
 *.tmp
+# Downloaded installer images
+*.iso
+*.img
+
+# Build directories
+/build/*
+/output/*
+/cache/*
+
+# Keep empty directories
+!/build/.gitkeep
+!/output/.gitkeep
+!/cache/.gitkeep
+
+# Extracted ISO files
+/source/
+iso-root/
+initrd-root/
+
+# Logs and checksums created during builds
+*.log
+*.sha256
+
+# Windows and editors
+Thumbs.db
+Desktop.ini
+.vscode/
+
+# Lenovo recovery binary images
+levono-recovery/emctools/px4px6_images/px4px6-4.1.414.34909_imager.tgz
+levono-recovery/emctools/px4px6_images/px4px6-4.1.414.34909_imager/apps
