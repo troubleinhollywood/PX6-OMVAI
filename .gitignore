@@ -1,0 +1,7 @@
+iso/*.iso
+output/*.iso
+output/*.img
+build/
+source/
+*.log
+*.tmp
