@@ -90,9 +90,9 @@ switch ($command) {
         $hash = Read-PasswordHash
         $ssh = Read-SshChoice
         $disk = Select-UsbDisk
-        $escapedHash = $hash.Replace("'", "'\"'\"'")
+        $escapedHash = $hash
         Invoke-Wsl "PX6_ADMIN_PASSWORD_HASH='$escapedHash' PX6_ENABLE_SSH='$ssh' sudo -E ./build.sh all"
-        $isoLinux = (& wsl.exe bash -lc "cd -- $WslRoot && source config/build.conf && realpath \"$OUTPUT_ISO\"").Trim()
+        $isoLinux = (& wsl.exe bash -lc "cd -- $WslRoot && source config/build.conf && realpath `"`$OUTPUT_ISO`"").Trim()
         $isoWindows = (& wsl.exe wslpath -w $isoLinux).Trim()
         if (-not (Test-Path $isoWindows)) { throw "Built ISO was not found at $isoWindows" }
         Write-AndVerifyUsb $isoWindows $disk
