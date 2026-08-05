@@ -1,323 +1,103 @@
 Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
-
+$ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ConfigPath = Join-Path $Root "config/build.conf"
-$DefaultWslRoot = "~/PX6-OMVAI-linux"
+$WslRoot = if ($env:PX6_OMVAI_WSL_ROOT) { $env:PX6_OMVAI_WSL_ROOT } else { '~/PX6-OMVAI-linux' }
 
-function Read-BuildConfig {
-    param(
-        [Parameter(Mandatory)]
-        [string] $Path
-    )
-
-    if (-not (Test-Path $Path)) {
-        throw "Build configuration not found at $Path"
-    }
-
-    $Config = @{}
-
-    foreach ($Line in Get-Content $Path) {
-        $Trimmed = $Line.Trim()
-
-        if (-not $Trimmed -or $Trimmed.StartsWith("#")) {
-            continue
-        }
-
-        if ($Trimmed -notmatch '^([A-Z0-9_]+)="(.*)"$') {
-            throw "Invalid build configuration line: $Line"
-        }
-
-        $Config[$Matches[1]] = $Matches[2]
-    }
-
-    return $Config
-}
-
-function Resolve-ProjectPath {
-    param(
-        [Parameter(Mandatory)]
-        [string] $RelativePath
-    )
-
-    return Join-Path $Root $RelativePath
-}
-
-function Get-GitBashPath {
-    $Candidates = @(
-        "C:\Program Files\Git\bin\bash.exe",
-        "C:\Program Files\Git\usr\bin\bash.exe"
-    )
-
-    foreach ($Candidate in $Candidates) {
-        if (Test-Path $Candidate) {
-            return $Candidate
-        }
-    }
-
-    throw "Git Bash was not found. Install Git for Windows."
-}
-
-function Invoke-BashScript {
-    param(
-        [Parameter(Mandatory)]
-        [string] $RelativeScriptPath,
-
-        [string[]] $Arguments = @()
-    )
-
-    $Bash = Get-GitBashPath
-    $ScriptPath = Resolve-ProjectPath $RelativeScriptPath
-
-    if (-not (Test-Path $ScriptPath)) {
-        throw "Required script not found at $ScriptPath"
-    }
-
-    & $Bash $ScriptPath @Arguments
-
-    if ($LASTEXITCODE -ne 0) {
-        throw "$RelativeScriptPath failed with exit code $LASTEXITCODE"
-    }
-}
-
-function Invoke-WslBuildStage {
-    param(
-        [Parameter(Mandatory)]
-        [ValidateSet("patch-uefi-bootloader", "rebuild-iso", "verify-output-iso")]
-        [string] $Stage
-    )
-
-    if (-not (Get-Command "wsl.exe" -ErrorAction SilentlyContinue)) {
-        throw "WSL is required for the $Stage stage."
-    }
-
-    $WslRoot = if ($env:PX6_OMVAI_WSL_ROOT) {
-        $env:PX6_OMVAI_WSL_ROOT
-    }
-    else {
-        $DefaultWslRoot
-    }
-
-    if ($WslRoot -match '[`"'';&|<>]') {
-        throw "PX6_OMVAI_WSL_ROOT contains unsupported shell characters."
-    }
-
-    $Command = "cd -- $WslRoot && ./build.sh $Stage"
-    & wsl.exe bash -lc $Command
-
-    if ($LASTEXITCODE -ne 0) {
-        throw "WSL build stage '$Stage' failed with exit code $LASTEXITCODE"
-    }
-}
-
-function Show-Usage {
-    Write-Host "PX6-OMVAI build framework"
-    Write-Host ""
-    Write-Host "Usage:"
-    Write-Host "  .\build.ps1 <command>"
-    Write-Host ""
-    Write-Host "Commands:"
-    Write-Host "  check"
-    Write-Host "  prepare"
-    Write-Host "  download"
-    Write-Host "  verify"
-    Write-Host "  extract"
-    Write-Host "  patch-uefi-bootloader Run in ~/PX6-OMVAI-linux through WSL"
-    Write-Host "  rebuild-iso           Run in ~/PX6-OMVAI-linux through WSL"
-    Write-Host "  verify-output-iso    Run in ~/PX6-OMVAI-linux through WSL"
-    Write-Host "  clean"
-    Write-Host "  status"
-    Write-Host "  all"
-    Write-Host "  help"
-}
-
-function Test-BuildDependencies {
-    $Required = @(
-        "git"
-    )
-
-    $Missing = @()
-
-    foreach ($CommandName in $Required) {
-        if (-not (Get-Command $CommandName -ErrorAction SilentlyContinue)) {
-            $Missing += $CommandName
-        }
-    }
-
+function Read-PasswordHash {
+    $first = Read-Host 'Create admin password' -AsSecureString
+    $second = Read-Host 'Confirm admin password' -AsSecureString
+    $p1 = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($first))
+    $p2 = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($second))
     try {
-        $null = Get-GitBashPath
+        if ($p1 -cne $p2) { throw 'Passwords do not match.' }
+        if ($p1.Length -lt 12) { throw 'Password must contain at least 12 characters.' }
+        $bytes = [Text.Encoding]::UTF8.GetBytes($p1)
+        $base64 = [Convert]::ToBase64String($bytes)
+        $command = "printf '%s' '$base64' | base64 -d | openssl passwd -6 -stdin"
+        $hash = (& wsl.exe bash -lc $command).Trim()
+        if ($LASTEXITCODE -ne 0 -or $hash -notmatch '^\$6\$') { throw 'SHA-512 password hashing failed in WSL. Ensure openssl is installed.' }
+        return $hash
     }
-    catch {
-        $Missing += "Git Bash"
+    finally {
+        $p1 = $null; $p2 = $null; $bytes = $null; $base64 = $null
+        [GC]::Collect()
     }
-
-    if ($Missing.Count -gt 0) {
-        throw "Missing dependencies: $($Missing -join ', ')"
-    }
-
-    Write-Host "[PX6-OMVAI] All required PowerShell-side dependencies are available"
 }
 
-function Prepare-BuildDirectories {
-    param(
-        [Parameter(Mandatory)]
-        [hashtable] $Config
-    )
-
-    $Directories = @(
-        $Config["CACHE_DIR"],
-        $Config["BUILD_DIR"],
-        $Config["OUTPUT_DIR"],
-        $Config["ISO_WORK_DIR"],
-        $Config["INITRD_WORK_DIR"]
-    )
-
-    foreach ($Directory in $Directories) {
-        if (-not $Directory) {
-            throw "A required build directory is missing from config/build.conf"
-        }
-
-        $Path = Resolve-ProjectPath $Directory
-        New-Item -ItemType Directory -Path $Path -Force | Out-Null
-    }
-
-    Write-Host "[PX6-OMVAI] Prepared build directories"
+function Read-SshChoice {
+    $answer = (Read-Host 'Allow SSH access for admin? [Y/n]').Trim().ToLowerInvariant()
+    if ($answer -eq '' -or $answer -eq 'y' -or $answer -eq 'yes') { return 'yes' }
+    if ($answer -eq 'n' -or $answer -eq 'no') { return 'no' }
+    throw 'Enter Y or N.'
 }
 
-function Clear-GeneratedFiles {
-    param(
-        [Parameter(Mandatory)]
-        [hashtable] $Config
-    )
-
-    foreach ($Key in @("BUILD_DIR", "OUTPUT_DIR")) {
-        $RelativePath = $Config[$Key]
-
-        if (-not $RelativePath) {
-            throw "Missing configuration value: $Key"
-        }
-
-        $Path = Resolve-ProjectPath $RelativePath
-
-        if (Test-Path $Path) {
-            Remove-Item $Path -Recurse -Force
-        }
-
-        New-Item -ItemType Directory -Path $Path -Force | Out-Null
-    }
-
-    Write-Host "[PX6-OMVAI] Removed generated build and output files"
+function Invoke-Wsl([string]$Command) {
+    & wsl.exe bash -lc "cd -- $WslRoot && $Command"
+    if ($LASTEXITCODE -ne 0) { throw "WSL command failed: $Command" }
 }
 
-function Show-BuildStatus {
-    param(
-        [Parameter(Mandatory)]
-        [hashtable] $Config
-    )
-
-    Write-Host "Project: $($Config['PROJECT_NAME'])"
-    Write-Host "Version: $($Config['PROJECT_VERSION'])"
-    Write-Host "Debian: $($Config['DEBIAN_VERSION']) $($Config['DEBIAN_ARCH'])"
-    Write-Host "Debian ISO: $($Config['DEBIAN_ISO_NAME'])"
-    Write-Host "Cache: $(Resolve-ProjectPath $Config['CACHE_DIR'])"
-    Write-Host "Build: $(Resolve-ProjectPath $Config['BUILD_DIR'])"
-    Write-Host "ISO work directory: $(Resolve-ProjectPath $Config['ISO_WORK_DIR'])"
-    Write-Host "Initrd work directory: $(Resolve-ProjectPath $Config['INITRD_WORK_DIR'])"
-    Write-Host "Output: $(Resolve-ProjectPath $Config['OUTPUT_DIR'])"
-    Write-Host "Output ISO: $(Resolve-ProjectPath $Config['OUTPUT_ISO'])"
-    Write-Host "WSL build copy: $DefaultWslRoot"
+function Get-UsbDisks {
+    @(Get-Disk | Where-Object { $_.BusType -eq 'USB' -and $_.OperationalStatus -ne 'Offline' } | Sort-Object Number)
 }
 
-function Download-DebianIso {
-    param(
-        [Parameter(Mandatory)]
-        [hashtable] $Config
-    )
-
-    Prepare-BuildDirectories $Config
-    Invoke-BashScript "scripts/download_iso.sh"
+function Select-UsbDisk {
+    $disks = Get-UsbDisks
+    if ($disks.Count -eq 0) { throw 'No online USB disk was detected.' }
+    $disks | Format-Table Number,FriendlyName,SerialNumber,@{N='SizeGiB';E={[math]::Round($_.Size/1GB,2)}} -AutoSize
+    $number = Read-Host 'Select USB device by disk number'
+    if ($number -notmatch '^\d+$') { throw 'Disk number must be numeric.' }
+    $disk = $disks | Where-Object Number -eq [int]$number
+    if (-not $disk) { throw 'The selected disk is not an eligible USB disk.' }
+    return $disk
 }
 
-function Test-DebianIso {
-    Invoke-BashScript "scripts/verify_iso.sh"
+function Write-AndVerifyUsb([string]$IsoPath,[Microsoft.Management.Infrastructure.CimInstance]$Disk) {
+    $confirmation = Read-Host "Are you sure? This USB device will be erased. Type ERASE DISK $($Disk.Number)"
+    if ($confirmation -cne "ERASE DISK $($Disk.Number)") { throw 'USB erase was not confirmed.' }
+    $iso = Get-Item $IsoPath
+    if ($Disk.Size -lt $iso.Length) { throw 'Selected USB disk is smaller than the ISO.' }
+    $physical = "\\.\PhysicalDrive$($Disk.Number)"
+    Set-Disk -Number $Disk.Number -IsOffline $true
+    try {
+        $source = [IO.File]::Open($iso.FullName,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+        $target = [IO.File]::Open($physical,[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,[IO.FileShare]::ReadWrite)
+        try { $source.CopyTo($target,4MB); $target.Flush($true) } finally { $target.Dispose(); $source.Dispose() }
+        $expected = (Get-FileHash -Algorithm SHA256 $iso.FullName).Hash
+        $sha = [Security.Cryptography.SHA256]::Create()
+        $stream = [IO.File]::Open($physical,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite)
+        try {
+            $remaining = $iso.Length; $buffer = New-Object byte[] (4MB)
+            while ($remaining -gt 0) {
+                $want = [int][Math]::Min($buffer.Length,$remaining)
+                $read = $stream.Read($buffer,0,$want)
+                if ($read -le 0) { throw 'Unexpected end of USB device during verification.' }
+                $sha.TransformBlock($buffer,0,$read,$null,0) | Out-Null
+                $remaining -= $read
+            }
+            $sha.TransformFinalBlock([byte[]]::new(0),0,0) | Out-Null
+            $actual = [BitConverter]::ToString($sha.Hash).Replace('-','')
+        } finally { $stream.Dispose(); $sha.Dispose() }
+        if ($actual -cne $expected) { throw "USB verification failed. Expected $expected, received $actual" }
+        Write-Host "USB verification passed: $actual"
+    }
+    finally { Set-Disk -Number $Disk.Number -IsOffline $false }
 }
 
-function Expand-DebianIso {
-    param(
-        [Parameter(Mandatory)]
-        [hashtable] $Config
-    )
-
-    Prepare-BuildDirectories $Config
-    Test-DebianIso
-    Invoke-BashScript "scripts/extract_iso.sh"
-}
-
-$Config = Read-BuildConfig $ConfigPath
-$CommandName = if ($args.Count -gt 0) {
-    $args[0].ToLowerInvariant()
-}
-else {
-    "help"
-}
-
-switch ($CommandName) {
-    "check" {
-        Test-BuildDependencies
+$command = if ($args.Count) { $args[0].ToLowerInvariant() } else { 'personalized-usb' }
+switch ($command) {
+    'personalized-usb' {
+        if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Run PowerShell as Administrator.' }
+        $hash = Read-PasswordHash
+        $ssh = Read-SshChoice
+        $disk = Select-UsbDisk
+        $escapedHash = $hash.Replace("'", "'\"'\"'")
+        Invoke-Wsl "PX6_ADMIN_PASSWORD_HASH='$escapedHash' PX6_ENABLE_SSH='$ssh' sudo -E ./build.sh all"
+        $isoLinux = (& wsl.exe bash -lc "cd -- $WslRoot && source config/build.conf && realpath \"$OUTPUT_ISO\"").Trim()
+        $isoWindows = (& wsl.exe wslpath -w $isoLinux).Trim()
+        if (-not (Test-Path $isoWindows)) { throw "Built ISO was not found at $isoWindows" }
+        Write-AndVerifyUsb $isoWindows $disk
+        Write-Host 'Personalized PX6-OMVAI USB is complete.'
     }
-
-    "prepare" {
-        Prepare-BuildDirectories $Config
-    }
-
-    "download" {
-        Download-DebianIso $Config
-    }
-
-    "verify" {
-        Test-DebianIso
-    }
-
-    "extract" {
-        Expand-DebianIso $Config
-    }
-
-    "patch-uefi-bootloader" {
-        Invoke-WslBuildStage "patch-uefi-bootloader"
-    }
-
-    "rebuild-iso" {
-        Invoke-WslBuildStage "rebuild-iso"
-    }
-
-    "verify-output-iso" {
-        Invoke-WslBuildStage "verify-output-iso"
-    }
-
-    "clean" {
-        Clear-GeneratedFiles $Config
-    }
-
-    "status" {
-        Show-BuildStatus $Config
-    }
-
-    "all" {
-        Test-BuildDependencies
-        Prepare-BuildDirectories $Config
-        Invoke-BashScript "scripts/download_iso.sh"
-        Invoke-BashScript "scripts/verify_iso.sh"
-        Invoke-BashScript "scripts/extract_iso.sh"
-        Write-Host "[PX6-OMVAI] Continue Linux-only stages in $DefaultWslRoot"
-        Write-Host "[PX6-OMVAI] Run sudo ./build.sh modify-initrd and rebuild-initrd, then run patch-bootloader, patch-uefi-bootloader, and rebuild-iso"
-    }
-
-    { $_ -in @("help", "-h", "--help") } {
-        Show-Usage
-    }
-
-    default {
-        Show-Usage
-        throw "Unknown build command: $CommandName"
-    }
+    'test' { Invoke-Wsl './build.sh test-personalization' }
+    default { throw "Unknown command: $command" }
 }
