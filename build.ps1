@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ConfigPath = Join-Path $Root "config/build.conf"
+$DefaultWslRoot = "~/PX6-OMVAI-linux"
 
 function Read-BuildConfig {
     param(
@@ -79,6 +80,36 @@ function Invoke-BashScript {
     }
 }
 
+function Invoke-WslBuildStage {
+    param(
+        [Parameter(Mandatory)]
+        [ValidateSet("rebuild-iso", "verify-output-iso")]
+        [string] $Stage
+    )
+
+    if (-not (Get-Command "wsl.exe" -ErrorAction SilentlyContinue)) {
+        throw "WSL is required for the $Stage stage."
+    }
+
+    $WslRoot = if ($env:PX6_OMVAI_WSL_ROOT) {
+        $env:PX6_OMVAI_WSL_ROOT
+    }
+    else {
+        $DefaultWslRoot
+    }
+
+    if ($WslRoot -match '[`"'';&|<>]') {
+        throw "PX6_OMVAI_WSL_ROOT contains unsupported shell characters."
+    }
+
+    $Command = "cd -- $WslRoot && ./build.sh $Stage"
+    & wsl.exe bash -lc $Command
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "WSL build stage '$Stage' failed with exit code $LASTEXITCODE"
+    }
+}
+
 function Show-Usage {
     Write-Host "PX6-OMVAI build framework"
     Write-Host ""
@@ -91,6 +122,8 @@ function Show-Usage {
     Write-Host "  download"
     Write-Host "  verify"
     Write-Host "  extract"
+    Write-Host "  rebuild-iso          Run in ~/PX6-OMVAI-linux through WSL"
+    Write-Host "  verify-output-iso    Run in ~/PX6-OMVAI-linux through WSL"
     Write-Host "  clean"
     Write-Host "  status"
     Write-Host "  all"
@@ -191,6 +224,7 @@ function Show-BuildStatus {
     Write-Host "Initrd work directory: $(Resolve-ProjectPath $Config['INITRD_WORK_DIR'])"
     Write-Host "Output: $(Resolve-ProjectPath $Config['OUTPUT_DIR'])"
     Write-Host "Output ISO: $(Resolve-ProjectPath $Config['OUTPUT_ISO'])"
+    Write-Host "WSL build copy: $DefaultWslRoot"
 }
 
 function Download-DebianIso {
@@ -247,6 +281,14 @@ switch ($CommandName) {
         Expand-DebianIso $Config
     }
 
+    "rebuild-iso" {
+        Invoke-WslBuildStage "rebuild-iso"
+    }
+
+    "verify-output-iso" {
+        Invoke-WslBuildStage "verify-output-iso"
+    }
+
     "clean" {
         Clear-GeneratedFiles $Config
     }
@@ -261,6 +303,8 @@ switch ($CommandName) {
         Invoke-BashScript "scripts/download_iso.sh"
         Invoke-BashScript "scripts/verify_iso.sh"
         Invoke-BashScript "scripts/extract_iso.sh"
+        Write-Host "[PX6-OMVAI] Continue Linux-only stages in $DefaultWslRoot"
+        Write-Host "[PX6-OMVAI] Run sudo ./build.sh modify-initrd, rebuild-initrd, then patch-bootloader and rebuild-iso"
     }
 
     { $_ -in @("help", "-h", "--help") } {

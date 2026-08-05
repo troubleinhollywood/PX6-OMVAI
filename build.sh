@@ -9,7 +9,7 @@ source "$ROOT_DIR/scripts/common.sh"
 load_config "$ROOT_DIR/config/build.conf"
 
 usage() {
-  cat <<EOF
+  cat <<EOF_USAGE
 $PROJECT_NAME $PROJECT_VERSION
 
 Usage:
@@ -40,6 +40,12 @@ Commands:
   patch-bootloader
       Configure unattended BIOS boot and PX6 serial-console output.
 
+  rebuild-iso
+      Rebuild the ISO using Debian's original BIOS and UEFI boot metadata.
+
+  verify-output-iso
+      Verify the rebuilt ISO boot metadata and modified installer files.
+
   clean
       Remove generated build and output files.
 
@@ -47,11 +53,11 @@ Commands:
       Show the current project and build configuration.
 
   all
-      Run all currently implemented build stages.
+      Run all implemented build stages.
 
   help
       Show this help.
-EOF
+EOF_USAGE
 }
 
 show_status() {
@@ -116,6 +122,14 @@ case "$command_name" in
     "$ROOT_DIR/scripts/patch_bootloader.sh"
     ;;
 
+  rebuild-iso)
+    "$ROOT_DIR/scripts/rebuild_iso.sh"
+    ;;
+
+  verify-output-iso)
+    "$ROOT_DIR/scripts/verify_output_iso.sh"
+    ;;
+
   clean)
     clean_generated
     ;;
@@ -133,6 +147,7 @@ case "$command_name" in
     "$ROOT_DIR/scripts/modify_initrd.sh"
     "$ROOT_DIR/scripts/rebuild_initrd.sh"
     "$ROOT_DIR/scripts/patch_bootloader.sh"
+    "$ROOT_DIR/scripts/rebuild_iso.sh"
     ;;
 
   help|-h|--help)
