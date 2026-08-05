@@ -22,6 +22,12 @@ Commands:
   prepare
       Create cache, build, and output directories.
 
+  download
+      Download the Debian installer ISO and checksum file.
+
+  verify
+      Verify the cached Debian ISO checksum.
+
   clean
       Remove generated build and output files.
 
@@ -29,7 +35,8 @@ Commands:
       Show the current project and build configuration.
 
   all
-      Run dependency checks and prepare directories.
+      Check dependencies, prepare directories, download Debian,
+      and verify the downloaded ISO.
 
   help
       Show this help.
@@ -40,6 +47,7 @@ show_status() {
   printf 'Project: %s\n' "$PROJECT_NAME"
   printf 'Version: %s\n' "$PROJECT_VERSION"
   printf 'Debian: %s %s\n' "$DEBIAN_VERSION" "$DEBIAN_ARCH"
+  printf 'Debian ISO: %s\n' "$DEBIAN_ISO_NAME"
   printf 'Cache: %s\n' "$ROOT_DIR/$CACHE_DIR"
   printf 'Build: %s\n' "$ROOT_DIR/$BUILD_DIR"
   printf 'Output: %s\n' "$ROOT_DIR/$OUTPUT_DIR"
@@ -69,6 +77,15 @@ case "$command_name" in
     "$ROOT_DIR/scripts/prepare_directories.sh"
     ;;
 
+  download)
+    "$ROOT_DIR/scripts/prepare_directories.sh"
+    "$ROOT_DIR/scripts/download_iso.sh"
+    ;;
+
+  verify)
+    "$ROOT_DIR/scripts/verify_iso.sh"
+    ;;
+
   clean)
     clean_generated
     ;;
@@ -80,6 +97,8 @@ case "$command_name" in
   all)
     "$ROOT_DIR/scripts/check_dependencies.sh"
     "$ROOT_DIR/scripts/prepare_directories.sh"
+    "$ROOT_DIR/scripts/download_iso.sh"
+    "$ROOT_DIR/scripts/verify_iso.sh"
     ;;
 
   help|-h|--help)
