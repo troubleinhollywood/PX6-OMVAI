@@ -83,7 +83,7 @@ function Invoke-BashScript {
 function Invoke-WslBuildStage {
     param(
         [Parameter(Mandatory)]
-        [ValidateSet("rebuild-iso", "verify-output-iso")]
+        [ValidateSet("patch-uefi-bootloader", "rebuild-iso", "verify-output-iso")]
         [string] $Stage
     )
 
@@ -122,7 +122,8 @@ function Show-Usage {
     Write-Host "  download"
     Write-Host "  verify"
     Write-Host "  extract"
-    Write-Host "  rebuild-iso          Run in ~/PX6-OMVAI-linux through WSL"
+    Write-Host "  patch-uefi-bootloader Run in ~/PX6-OMVAI-linux through WSL"
+    Write-Host "  rebuild-iso           Run in ~/PX6-OMVAI-linux through WSL"
     Write-Host "  verify-output-iso    Run in ~/PX6-OMVAI-linux through WSL"
     Write-Host "  clean"
     Write-Host "  status"
@@ -281,6 +282,10 @@ switch ($CommandName) {
         Expand-DebianIso $Config
     }
 
+    "patch-uefi-bootloader" {
+        Invoke-WslBuildStage "patch-uefi-bootloader"
+    }
+
     "rebuild-iso" {
         Invoke-WslBuildStage "rebuild-iso"
     }
@@ -304,7 +309,7 @@ switch ($CommandName) {
         Invoke-BashScript "scripts/verify_iso.sh"
         Invoke-BashScript "scripts/extract_iso.sh"
         Write-Host "[PX6-OMVAI] Continue Linux-only stages in $DefaultWslRoot"
-        Write-Host "[PX6-OMVAI] Run sudo ./build.sh modify-initrd, rebuild-initrd, then patch-bootloader and rebuild-iso"
+        Write-Host "[PX6-OMVAI] Run sudo ./build.sh modify-initrd and rebuild-initrd, then run patch-bootloader, patch-uefi-bootloader, and rebuild-iso"
     }
 
     { $_ -in @("help", "-h", "--help") } {

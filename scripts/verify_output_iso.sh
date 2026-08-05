@@ -148,6 +148,7 @@ modified_files=(
   "install.amd/initrd.gz"
   "isolinux/isolinux.cfg"
   "isolinux/txt.cfg"
+  "boot/grub/grub.cfg"
 )
 
 for relative_path in "${modified_files[@]}"; do
@@ -178,7 +179,28 @@ grep -q 'console=ttyS0,115200n8' "$extract_dir/isolinux/txt.cfg" ||
 grep -q '^serial 0 115200' "$extract_dir/isolinux/isolinux.cfg" ||
   die "Output ISOLINUX configuration is missing serial output"
 
+grep -Fq "menuentry 'PX6-OMVAI unattended installer'" "$extract_dir/boot/grub/grub.cfg" ||
+  die "Output GRUB configuration is missing the PX6 unattended entry"
+grep -Fq 'auto=true' "$extract_dir/boot/grub/grub.cfg" ||
+  die "Output GRUB configuration is missing automatic installation"
+grep -Fq 'priority=critical' "$extract_dir/boot/grub/grub.cfg" ||
+  die "Output GRUB configuration is missing critical installer priority"
+grep -Fq 'preseed/file=/preseed.cfg' "$extract_dir/boot/grub/grub.cfg" ||
+  die "Output GRUB configuration is missing the embedded preseed path"
+grep -Fq 'console=ttyS0,115200n8' "$extract_dir/boot/grub/grub.cfg" ||
+  die "Output GRUB configuration is missing the ttyS0 serial console"
+grep -Fq 'serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1' "$extract_dir/boot/grub/grub.cfg" ||
+  die "Output GRUB configuration is missing serial-port settings"
+grep -Fq 'terminal_input serial console' "$extract_dir/boot/grub/grub.cfg" ||
+  die "Output GRUB configuration is missing serial input"
+grep -Fq 'terminal_output serial console' "$extract_dir/boot/grub/grub.cfg" ||
+  die "Output GRUB configuration is missing serial output"
+grep -Eq '^set default=0$' "$extract_dir/boot/grub/grub.cfg" ||
+  die "Output GRUB configuration does not select the PX6 entry by default"
+grep -Eq '^set timeout=5$' "$extract_dir/boot/grub/grub.cfg" ||
+  die "Output GRUB configuration does not use the unattended timeout"
+
 trap - EXIT
 rm -rf "$extract_dir"
 
-log "Verified BIOS, UEFI, hybrid metadata, volume label, and headless installer files"
+log "Verified BIOS and UEFI unattended serial boot, hybrid metadata, volume label, and installer files"

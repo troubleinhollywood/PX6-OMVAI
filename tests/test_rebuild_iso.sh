@@ -41,6 +41,9 @@ grep -q -- '-map "$iso_root/isolinux/isolinux.cfg" /isolinux/isolinux.cfg' "$reb
 grep -q -- '-map "$iso_root/isolinux/txt.cfg" /isolinux/txt.cfg' "$rebuild_script" ||
   fail "modified boot menu is not replaced"
 
+grep -q -- '-map "$iso_root/boot/grub/grub.cfg" /boot/grub/grub.cfg' "$rebuild_script" ||
+  fail "modified UEFI GRUB menu is not replaced"
+
 if grep -Eq -- '(-b[[:space:]]+|eltorito-boot|isohdpfx|efi\.img|isolinux\.bin)' "$rebuild_script"; then
   fail "rebuild script contains guessed boot-image parameters"
 fi
@@ -71,6 +74,7 @@ mkdir -p \
   "$project/cache" \
   "$project/build/iso/install.amd" \
   "$project/build/iso/isolinux" \
+  "$project/build/iso/boot/grub" \
   "$project/output" \
   "$sandbox/bin"
 
@@ -107,6 +111,17 @@ default vesamenu.c32
 serial 0 115200
 console 0
 ISOLINUX
+cat > "$project/build/iso/boot/grub/grub.cfg" <<'GRUB'
+serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1
+terminal_input serial console
+terminal_output serial console
+set default=0
+set timeout=5
+menuentry 'PX6-OMVAI unattended installer' {
+    linux /install.amd/vmlinuz auto=true priority=critical preseed/file=/preseed.cfg console=tty0 console=ttyS0,115200n8 DEBIAN_FRONTEND=newt --- quiet
+    initrd /install.amd/initrd.gz
+}
+GRUB
 
 cat > "$sandbox/bin/xorriso" <<'MOCK'
 #!/usr/bin/env bash
@@ -190,13 +205,13 @@ PATH="$sandbox/bin:$PATH" "$project/scripts/rebuild_iso.sh" \
 grep -q -- '-boot_image any replay' "$sandbox/xorriso.log" ||
   fail "mock runtime did not invoke boot replay"
 
-grep -q 'Verified BIOS, UEFI, hybrid metadata, volume label, and headless installer files' \
+grep -q 'Verified BIOS and UEFI unattended serial boot, hybrid metadata, volume label, and installer files' \
   "$sandbox/rebuild-output.txt" ||
   fail "mock runtime did not complete output verification"
 
 pass "rebuild stage derives boot configuration from the original ISO"
 pass "rebuild stage replaces only modified installer files"
 pass "verification checks BIOS, UEFI, MBR, GPT, APM, and volume label"
-pass "verification checks unattended ttyS0 boot configuration"
+pass "verification checks BIOS and UEFI unattended ttyS0 boot configuration"
 pass "build.sh and build.ps1 expose the new stages"
 pass "mock rebuild completes verification before publishing the ISO"

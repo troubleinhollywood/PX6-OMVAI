@@ -40,6 +40,7 @@ required_modified_files=(
   "install.amd/initrd.gz"
   "isolinux/isolinux.cfg"
   "isolinux/txt.cfg"
+  "boot/grub/grub.cfg"
 )
 
 for relative_path in "${required_modified_files[@]}"; do
@@ -52,6 +53,12 @@ grep -q 'console=ttyS0,115200n8' "$iso_root/isolinux/txt.cfg" ||
 
 grep -q '^serial 0 115200' "$iso_root/isolinux/isolinux.cfg" ||
   die "Modified ISOLINUX configuration is missing serial output"
+
+grep -Fq 'console=ttyS0,115200n8' "$iso_root/boot/grub/grub.cfg" ||
+  die "Modified GRUB configuration is missing the ttyS0 serial-console argument"
+
+grep -Fq 'terminal_output serial console' "$iso_root/boot/grub/grub.cfg" ||
+  die "Modified GRUB configuration is missing serial output"
 
 original_real="$(readlink -f "$original_iso")"
 output_real="$(readlink -m "$output_iso")"
@@ -97,6 +104,7 @@ xorriso \
   -map "$iso_root/install.amd/initrd.gz" /install.amd/initrd.gz \
   -map "$iso_root/isolinux/isolinux.cfg" /isolinux/isolinux.cfg \
   -map "$iso_root/isolinux/txt.cfg" /isolinux/txt.cfg \
+  -map "$iso_root/boot/grub/grub.cfg" /boot/grub/grub.cfg \
   -boot_image any replay \
   -commit \
   -end

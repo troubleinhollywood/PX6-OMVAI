@@ -40,6 +40,9 @@ Commands:
   patch-bootloader
       Configure unattended BIOS boot and PX6 serial-console output.
 
+  patch-uefi-bootloader
+      Configure unattended UEFI GRUB boot and PX6 serial-console output.
+
   rebuild-iso
       Rebuild the ISO using Debian's original BIOS and UEFI boot metadata.
 
@@ -122,6 +125,10 @@ case "$command_name" in
     "$ROOT_DIR/scripts/patch_bootloader.sh"
     ;;
 
+  patch-uefi-bootloader)
+    "$ROOT_DIR/scripts/patch_uefi_bootloader.sh"
+    ;;
+
   rebuild-iso)
     "$ROOT_DIR/scripts/rebuild_iso.sh"
     ;;
@@ -147,6 +154,7 @@ case "$command_name" in
     "$ROOT_DIR/scripts/modify_initrd.sh"
     "$ROOT_DIR/scripts/rebuild_initrd.sh"
     "$ROOT_DIR/scripts/patch_bootloader.sh"
+    "$ROOT_DIR/scripts/patch_uefi_bootloader.sh"
     "$ROOT_DIR/scripts/rebuild_iso.sh"
     ;;
 
