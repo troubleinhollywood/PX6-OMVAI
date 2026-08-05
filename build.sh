@@ -29,7 +29,13 @@ Commands:
       Verify the cached Debian ISO checksum.
 
   extract
-      Verify and extract the Debian ISO into the build directory.
+      Extract the verified Debian ISO into the build directory.
+
+  modify-initrd
+      Unpack the Debian installer initrd and inject PX6-OMVAI files.
+
+  rebuild-initrd
+      Rebuild the modified Debian installer initrd.
 
   clean
       Remove generated build and output files.
@@ -38,8 +44,7 @@ Commands:
       Show the current project and build configuration.
 
   all
-      Check dependencies, prepare directories, download Debian,
-      verify the ISO, and extract it into the build directory.
+      Run all currently implemented build stages.
 
   help
       Show this help.
@@ -50,7 +55,6 @@ show_status() {
   printf 'Project: %s\n' "$PROJECT_NAME"
   printf 'Version: %s\n' "$PROJECT_VERSION"
   printf 'Debian: %s %s\n' "$DEBIAN_VERSION" "$DEBIAN_ARCH"
-  printf 'Debian ISO: %s\n' "$DEBIAN_ISO_NAME"
   printf 'Cache: %s\n' "$ROOT_DIR/$CACHE_DIR"
   printf 'Build: %s\n' "$ROOT_DIR/$BUILD_DIR"
   printf 'ISO work directory: %s\n' "$ROOT_DIR/$ISO_WORK_DIR"
@@ -97,6 +101,14 @@ case "$command_name" in
     "$ROOT_DIR/scripts/extract_iso.sh"
     ;;
 
+  modify-initrd)
+    "$ROOT_DIR/scripts/modify_initrd.sh"
+    ;;
+
+  rebuild-initrd)
+    "$ROOT_DIR/scripts/rebuild_initrd.sh"
+    ;;
+
   clean)
     clean_generated
     ;;
@@ -111,6 +123,8 @@ case "$command_name" in
     "$ROOT_DIR/scripts/download_iso.sh"
     "$ROOT_DIR/scripts/verify_iso.sh"
     "$ROOT_DIR/scripts/extract_iso.sh"
+    "$ROOT_DIR/scripts/modify_initrd.sh"
+    "$ROOT_DIR/scripts/rebuild_initrd.sh"
     ;;
 
   help|-h|--help)
