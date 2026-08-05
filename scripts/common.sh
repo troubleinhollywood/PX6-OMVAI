@@ -30,7 +30,11 @@ load_config() {
 }
 
 is_true() {
-  case "${1:-}" in
+  local value="${1:-}"
+
+  value="${value//$'\r'/}"
+
+  case "$value" in
     1|true|TRUE|yes|YES)
       return 0
       ;;

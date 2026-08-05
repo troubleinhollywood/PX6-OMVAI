@@ -163,7 +163,7 @@ while IFS=$'\t' read -r \
   fstype \
   md_member \
   model \
-  serial
+  serial || [[ -n "${name:-}" ]]
 do
   [[ -n "${name:-}" ]] || continue
   [[ "${name:0:1}" != "#" ]] || continue
