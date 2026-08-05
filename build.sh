@@ -37,6 +37,9 @@ Commands:
   rebuild-initrd
       Rebuild the modified Debian installer initrd.
 
+  patch-bootloader
+      Configure unattended BIOS boot and PX6 serial-console output.
+
   clean
       Remove generated build and output files.
 
@@ -109,6 +112,10 @@ case "$command_name" in
     "$ROOT_DIR/scripts/rebuild_initrd.sh"
     ;;
 
+  patch-bootloader)
+    "$ROOT_DIR/scripts/patch_bootloader.sh"
+    ;;
+
   clean)
     clean_generated
     ;;
@@ -125,6 +132,7 @@ case "$command_name" in
     "$ROOT_DIR/scripts/extract_iso.sh"
     "$ROOT_DIR/scripts/modify_initrd.sh"
     "$ROOT_DIR/scripts/rebuild_initrd.sh"
+    "$ROOT_DIR/scripts/patch_bootloader.sh"
     ;;
 
   help|-h|--help)
