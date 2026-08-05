@@ -28,6 +28,9 @@ Commands:
   verify
       Verify the cached Debian ISO checksum.
 
+  extract
+      Verify and extract the Debian ISO into the build directory.
+
   clean
       Remove generated build and output files.
 
@@ -36,7 +39,7 @@ Commands:
 
   all
       Check dependencies, prepare directories, download Debian,
-      and verify the downloaded ISO.
+      verify the ISO, and extract it into the build directory.
 
   help
       Show this help.
@@ -50,6 +53,8 @@ show_status() {
   printf 'Debian ISO: %s\n' "$DEBIAN_ISO_NAME"
   printf 'Cache: %s\n' "$ROOT_DIR/$CACHE_DIR"
   printf 'Build: %s\n' "$ROOT_DIR/$BUILD_DIR"
+  printf 'ISO work directory: %s\n' "$ROOT_DIR/$ISO_WORK_DIR"
+  printf 'Initrd work directory: %s\n' "$ROOT_DIR/$INITRD_WORK_DIR"
   printf 'Output: %s\n' "$ROOT_DIR/$OUTPUT_DIR"
   printf 'Output ISO: %s\n' "$ROOT_DIR/$OUTPUT_ISO"
 }
@@ -86,6 +91,12 @@ case "$command_name" in
     "$ROOT_DIR/scripts/verify_iso.sh"
     ;;
 
+  extract)
+    "$ROOT_DIR/scripts/verify_iso.sh"
+    "$ROOT_DIR/scripts/prepare_directories.sh"
+    "$ROOT_DIR/scripts/extract_iso.sh"
+    ;;
+
   clean)
     clean_generated
     ;;
@@ -99,6 +110,7 @@ case "$command_name" in
     "$ROOT_DIR/scripts/prepare_directories.sh"
     "$ROOT_DIR/scripts/download_iso.sh"
     "$ROOT_DIR/scripts/verify_iso.sh"
+    "$ROOT_DIR/scripts/extract_iso.sh"
     ;;
 
   help|-h|--help)
