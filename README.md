@@ -14,14 +14,6 @@ A compatible USB-to-TTL UART serial adapter can connect a computer to the NAS co
 
 The linked guide describes a serial console at **115200 baud, 8 data bits, no parity, 1 stop bit (115200 8N1)**. These details are a third-party reference, not yet a verified record of this repository's own PX6 conversion wiring.
 
-### Example USB-to-UART TTL cable
-
-![Example FTDI USB-to-TTL serial cable with header connector](https://commons.wikimedia.org/wiki/Special:FilePath/FTDI_Cable.jpg?width=960)
-
-*Example cable photograph by [oomlout](https://commons.wikimedia.org/wiki/File:FTDI_Cable.jpg), licensed under [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/). Shown for illustration only; this is not a confirmed photograph of the exact adapter used for our PX6 conversion. No changes were made to the photograph.*
-
-This pictured cable has a six-position connector, whereas the PX6 reference describes a four-pin header. **Do not plug the connector onto the board by matching its shape or wire colors.** Identify the adapter's TX, RX, and GND contacts from its documentation and verify the board pinout and signal levels before making a three-wire connection. Leave VCC disconnected.
-
 ## v0.2 roadmap
 
 1. Set up the repository structure.
