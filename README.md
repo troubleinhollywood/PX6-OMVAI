@@ -2,6 +2,18 @@
 
 Build tooling for a Debian 13.6 based unattended OpenMediaVault installer for the LenovoEMC/Iomega PX6-300d.
 
+## PX6 serial console connection (UART)
+
+The PX6-300d has an internal serial header identified as `SERIAL_B` in the independent hardware reference below. This reference photograph shows the motherboard connection.
+
+[![PX6-300d SERIAL_B motherboard header with serial wiring (external reference photograph)](https://open-desk.org/posts/linux-on-lenovo-emc-px6-300d/px6_serial_connector.png)](https://open-desk.org/posts/linux-on-lenovo-emc-px6-300d/)
+
+*Photograph and hardware reference: [Dustin Frisch, “Linux on Lenovo-EMC PX6-300d”](https://open-desk.org/posts/linux-on-lenovo-emc-px6-300d/). The image is displayed from its original site and is not copied into this repository. If the original site becomes unavailable, the image may stop displaying.*
+
+A compatible USB-to-TTL UART serial adapter can connect a computer to the NAS console. **Confirm the pinout and logic voltage on your particular board before connecting anything.** In a typical three-wire TTL connection, the board TX connects to adapter RX, board RX to adapter TX, and GND to GND. **Do not connect the adapter's VCC/power lead.** Never connect an RS-232 voltage-level adapter directly to a TTL header.
+
+The linked guide describes a serial console at **115200 baud, 8 data bits, no parity, 1 stop bit (115200 8N1)**. These details are a third-party reference, not yet a verified record of this repository's own PX6 conversion wiring.
+
 ## v0.2 roadmap
 
 1. Set up the repository structure.
